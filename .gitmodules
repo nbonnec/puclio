@@ -1,0 +1,3 @@
+[submodule "ressources/lib/putio2"]
+	path = ressources/lib/putio2
+	url = git@github.com:thevegeta/putio-api2-python.git
