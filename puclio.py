@@ -4,9 +4,7 @@
 # A Putio Utility, Command LIne Oriented.
 #
 # TODO:
-#       - setup,
 #       - manage bad token,
-#       - use config parser.
 
 import argparse
 import configparser
@@ -33,8 +31,13 @@ def init_parser():
             "A Putio Utility, Command LIne Oriented.")
     subparsers = p.add_subparsers(dest='cmd')
 
-    parser_ls = subparsers.add_parser('ls')
-    parser_setup = subparsers.add_parser('setup')
+    parser_ls = subparsers.add_parser('ls', help = "list files")
+    parser_ls.add_argument("-a", "--all", help = "show more informations",
+            action = "store_true")
+    parser_ls.add_argument("id", type = int, nargs = '?', default = 0,
+            help = "ID to list")
+    parser_setup = subparsers.add_parser('setup',
+            help = "setup your Oauth account")
     return p
 
 def init_account():
@@ -46,10 +49,19 @@ def init_account():
         print("No configuration file.")
         setup_account(config)
 
-    token = config['account']['token']
+    try:
+        token = config['account']['token']
+    except KeyError:
+        print("Problem with the configuration file. \n"
+                "Try to run " + sys.argv[0] + " setup.")
+        exit(1)
 
     return putio2.Client(token)
 
+def list_files(putio, args = None):
+        files = putio.File.list(args.id)
+        for idx, f in enumerate(files):
+            yield "{0:>3}    {1}".format(idx + 1, f.name)
 
 if __name__ == "__main__":
 
@@ -67,7 +79,6 @@ if __name__ == "__main__":
     putio = init_account()
 
     if args.cmd == 'ls':
-        files = putio.File.list()
-        for idx, f in enumerate(files):
-            print(str(idx + 1) + "    " + f.name)
+        for files in list_files(putio, args):
+            print(files)
 
