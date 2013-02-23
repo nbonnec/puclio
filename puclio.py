@@ -7,6 +7,7 @@
 #       - manage bad token,
 
 import argparse
+import collections
 import configparser
 import logging
 import os
@@ -31,12 +32,13 @@ def init_parser():
             "A Putio Utility, Command LIne Oriented.")
     subparsers = p.add_subparsers(dest='cmd')
 
-    parser_ls = subparsers.add_parser('ls', help = "list files")
-    parser_ls.add_argument("-a", "--all", help = "show more informations",
+    ls = subparsers.add_parser('ls', help = "list files")
+    ls.add_argument("-a", "--all", help = "show more informations",
             action = "store_true")
-    parser_ls.add_argument("id", type = int, nargs = '?', default = 0,
+    ls.add_argument("id", type = int, nargs = '?', default = 0,
             help = "ID to list")
-    parser_setup = subparsers.add_parser('setup',
+    tree = subparsers.add_parser('tree', help = "list files as a tree")
+    setup = subparsers.add_parser('setup',
             help = "setup your Oauth account")
     return p
 
@@ -59,9 +61,25 @@ def init_account():
     return putio2.Client(token)
 
 def list_files(putio, args = None):
-        files = putio.File.list(args.id)
-        for idx, f in enumerate(files):
-            yield "{0:>3}    {1}".format(idx + 1, f.name)
+    files = putio.File.list(args.id)
+    for idx, f in enumerate(files):
+        yield "{0:>3}    {1}".format(idx + 1, f.name)
+
+def tree_files(putio, args = None):
+    def go_deep(tree, id, depth, s_list):
+        for k, v in tree[id].items():
+            s_list.append("    " * depth + v)
+            if k in tree:
+                go_deep(tree, k, depth + 1, s_list)
+
+    tree = collections.defaultdict(dict)
+    my_list = list()
+    files = putio.File.list(-1)
+    for idx, f in enumerate(files):
+        tree[f.parent_id][f.id] = f.name
+    go_deep(tree, 0, 0, my_list)
+    for s in my_list:
+        yield s
 
 if __name__ == "__main__":
 
@@ -81,4 +99,6 @@ if __name__ == "__main__":
     if args.cmd == 'ls':
         for files in list_files(putio, args):
             print(files)
-
+    elif args.cmd == 'tree':
+        for files in tree_files(putio, args):
+            print(files)
