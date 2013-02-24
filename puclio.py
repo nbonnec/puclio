@@ -14,7 +14,8 @@ import os
 import sys
 from ressources.lib.putio2 import putio2
 
-CONFIG_PATH = "~/.config/puclio/config"
+DIR_CONFIG_PATH = "~/.config/puclio"
+CONFIG_PATH = DIR_CONFIG_PATH + "/config"
 PUTIO_APP_ID = "337"
 PUTIO_TOKEN_PATH = "http://put.io/v2/oauth2/apptoken/" + PUTIO_APP_ID
 
@@ -24,6 +25,8 @@ def setup_account():
                 ".\nOauth token ? ")
     config.add_section('account')
     config.set('account', 'token', tok)
+    if not os.path.exists(os.path.expanduser(CONFIG_PATH)):
+        os.makedirs(os.path.expanduser(DIR_CONFIG_PATH), 0o775)
     with open(os.path.expanduser(CONFIG_PATH), 'w') as configfile:
         config.write(configfile)
 
