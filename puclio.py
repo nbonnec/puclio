@@ -41,7 +41,12 @@ def init_parser():
             action = "store_true")
     ls.add_argument("id", type = int, nargs = '?', default = 0,
             help = "ID to list")
+
     tree = subparsers.add_parser('tree', help = "list files as a tree")
+
+    dl = subparsers.add_parser('dl', help = "dowload files")
+    dl.add_argument("id", type = int, help = "ID to dowload")
+
     setup = subparsers.add_parser('setup',
             help = "setup your Oauth account")
     return p
@@ -72,7 +77,9 @@ def list_files(putio, args = None):
         exit(1)
 
     for idx, f in enumerate(files):
-        yield "{0:>3}    {1}".format(idx + 1, f.name)
+        s = "(" + str(idx + 1) +")"
+        print("{0:>5} {2} {1}".format(s, f.name, f.id))
+
 
 def tree_files(putio, args = None):
     # Maybe not print and search at the same time to improve formatting.
@@ -94,6 +101,12 @@ def tree_files(putio, args = None):
     print(".")
     go_deep(tree, 0, 0)
 
+def download(putio, args = None):
+    #use curl -J -O
+    f = putio.File.get(args.id)
+    url = f.download(ext = True)
+    print(url)
+
 if __name__ == "__main__":
 
     parser = init_parser()
@@ -110,7 +123,9 @@ if __name__ == "__main__":
     putio = init_account()
 
     if args.cmd == 'ls':
-        for files in list_files(putio, args):
-            print(files)
+        list_files(putio, args)
     elif args.cmd == 'tree':
         tree_files(putio, args)
+    elif args.cmd == 'dl':
+        download(putio, args)
+
