@@ -5,6 +5,7 @@
 #
 # TODO:
 #       - manage bad token,
+#       - prettier tree.
 
 import argparse
 import collections
@@ -14,7 +15,8 @@ import os
 import sys
 from ressources.lib.putio2 import putio2
 
-CONFIG_PATH = "~/.config/puclio/config"
+DIR_CONFIG_PATH = "~/.config/puclio"
+CONFIG_PATH = DIR_CONFIG_PATH + "/config"
 PUTIO_APP_ID = "337"
 PUTIO_TOKEN_PATH = "http://put.io/v2/oauth2/apptoken/" + PUTIO_APP_ID
 
@@ -24,6 +26,8 @@ def setup_account():
                 ".\nOauth token ? ")
     config.add_section('account')
     config.set('account', 'token', tok)
+    if not os.path.exists(os.path.expanduser(CONFIG_PATH)):
+        os.makedirs(os.path.expanduser(DIR_CONFIG_PATH), 0o775)
     with open(os.path.expanduser(CONFIG_PATH), 'w') as configfile:
         config.write(configfile)
 
@@ -61,25 +65,34 @@ def init_account():
     return putio2.Client(token)
 
 def list_files(putio, args = None):
-    files = putio.File.list(args.id)
+    try:
+        files = putio.File.list(args.id)
+    except Exception:
+        print("Something went wrong on the server. Check the ID.")
+        exit(1)
+
     for idx, f in enumerate(files):
         yield "{0:>3}    {1}".format(idx + 1, f.name)
 
 def tree_files(putio, args = None):
-    def go_deep(tree, id, depth, s_list):
+    # Maybe not print and search at the same time to improve formatting.
+    def go_deep(tree, id, depth):
         for k, v in tree[id].items():
-            s_list.append("    " * depth + v)
+            print("|" + "    |" * depth + "––– " + v)
             if k in tree:
-                go_deep(tree, k, depth + 1, s_list)
+                go_deep(tree, k, depth + 1)
+
+    try:
+        files = putio.File.list(-1)
+    except:
+        print("Could not list all file; server response was not valid.")
+        exit(1)
 
     tree = collections.defaultdict(dict)
-    my_list = list()
-    files = putio.File.list(-1)
     for idx, f in enumerate(files):
         tree[f.parent_id][f.id] = f.name
-    go_deep(tree, 0, 0, my_list)
-    for s in my_list:
-        yield s
+    print(".")
+    go_deep(tree, 0, 0)
 
 if __name__ == "__main__":
 
@@ -100,5 +113,4 @@ if __name__ == "__main__":
         for files in list_files(putio, args):
             print(files)
     elif args.cmd == 'tree':
-        for files in tree_files(putio, args):
-            print(files)
+        tree_files(putio, args)
