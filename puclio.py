@@ -43,10 +43,16 @@ def init_parser():
     ls.add_argument("id", type = int, nargs = '?', default = 0,
             help = "ID to list")
 
+    rm = subparsers.add_parser("rm", help = "delete a file")
+    rm.add_argument("id", type = int, nargs = '+', help = "ID to delete")
+
     tree = subparsers.add_parser('tree', help = "list files as a tree")
 
+    up = subparsers.add_parser('up', help = "upload a file on put.io")
+    up.add_argument("file", type = str, nargs = '+',  help = "file to upload")
+
     dl = subparsers.add_parser('dl', help = "dowload files")
-    dl.add_argument("id", type = int, help = "ID to dowload")
+    dl.add_argument("id", type = int, nargs = '+', help = "ID to dowload")
 
     setup = subparsers.add_parser('setup',
             help = "setup your Oauth account")
@@ -97,11 +103,19 @@ def tree_files(putio, args = None):
     print(".")
     go_deep(tree, 0, 0)
 
-def download(putio, args = None):
-    #use curl -J -O
-    f = putio.File.get(args.id)
-    url = f.download(ext = True)
-    subprocess.call(["curl", "-J", "-O", url])
+def download(putio, args):
+    for i in args.id:
+        f = putio.File.get(i)
+        url = f.download(ext = True)
+        subprocess.call(["curl", "-J", "-O", url])
+
+def upload(putio, args):
+    for f in args.file:
+        putio.File.upload(f, os.path.basename(f))
+
+def delete(putio, args):
+    for i in args.id:
+        putio.File.get(i).delete()
 
 if __name__ == "__main__":
 
@@ -124,4 +138,8 @@ if __name__ == "__main__":
         tree_files(putio, args)
     elif args.cmd == 'dl':
         download(putio, args)
+    elif args.cmd == 'rm':
+        delete(putio, args)
+    elif args.cmd == 'up':
+        upload(putio, args)
 
