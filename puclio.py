@@ -21,6 +21,9 @@ CONFIG_PATH = DIR_CONFIG_PATH + "/config"
 PUTIO_APP_ID = "337"
 PUTIO_TOKEN_PATH = "http://put.io/v2/oauth2/apptoken/" + PUTIO_APP_ID
 
+BOLD = '[1m'
+NC = '[0m'
+
 def setup_account():
     config = configparser.ConfigParser()
     tok = input("To get your Oauth token go to: " + PUTIO_TOKEN_PATH +
@@ -42,6 +45,8 @@ def init_parser():
             action = "store_true")
     ls.add_argument("id", type = int, nargs = '?', default = 0,
             help = "ID to list")
+
+    lt = subparsers.add_parser('lt', help = "list transfers")
 
     rm = subparsers.add_parser("rm", help = "delete a file")
     rm.add_argument("id", type = int, nargs = '+', help = "ID to delete")
@@ -78,10 +83,13 @@ def list_files(putio, args = None):
         print("Something went wrong on the server. Check the ID.")
         exit(1)
 
-    for idx, f in enumerate(files):
-        s = "(" + str(idx + 1) +")"
-        print("{0:>5} {2} {1}".format(s, f.name, f.id))
+    for f in files:
+        print(" {:>8}  {}".format(BOLD + str(f.id) + NC, f.name))
 
+def list_transfers(putio, args = None):
+    transfers = putio.Transfer.list()
+    for t in transfers:
+        print(" {:>7}  {}".format(BOLD + str(t.id) + NC, t.name))
 
 def tree_files(putio, args = None):
     # Maybe not print and search at the same time to improve formatting.
@@ -142,4 +150,6 @@ if __name__ == "__main__":
         delete(putio, args)
     elif args.cmd == 'up':
         upload(putio, args)
+    elif args.cmd == 'lt':
+        list_transfers(putio, args)
 
