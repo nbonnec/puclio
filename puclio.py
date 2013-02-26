@@ -12,6 +12,7 @@ import collections
 import configparser
 import logging
 import os
+import subprocess
 import sys
 from ressources.lib.putio2 import putio2
 
@@ -56,15 +57,10 @@ def init_account():
 
     try:
         config.read_file(open(os.path.expanduser(CONFIG_PATH)))
-    except FileNotFoundError:
-        print("No configuration file.")
-        setup_account(config)
-
-    try:
         token = config['account']['token']
-    except KeyError:
-        print("Problem with the configuration file. \n"
-                "Try to run " + sys.argv[0] + " setup.")
+    except:
+        print("Problem with the configuration file.")
+        print("Please run " + sys.argv[0] + " setup.")
         exit(1)
 
     return putio2.Client(token)
@@ -105,7 +101,7 @@ def download(putio, args = None):
     #use curl -J -O
     f = putio.File.get(args.id)
     url = f.download(ext = True)
-    print(url)
+    subprocess.call(["curl", "-J", "-O", url])
 
 if __name__ == "__main__":
 
