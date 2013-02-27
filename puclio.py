@@ -30,10 +30,13 @@ def setup_account():
                 ".\nOauth token ? ")
     config.add_section('account')
     config.set('account', 'token', tok)
-    if not os.path.exists(os.path.expanduser(CONFIG_PATH)):
-        os.makedirs(os.path.expanduser(DIR_CONFIG_PATH), 0o775)
-    with open(os.path.expanduser(CONFIG_PATH), 'w') as configfile:
-        config.write(configfile)
+    try:
+        if not os.path.exists(os.path.expanduser(CONFIG_PATH)):
+            os.makedirs(os.path.expanduser(DIR_CONFIG_PATH), 0o775)
+        with open(os.path.expanduser(CONFIG_PATH), 'w') as configfile:
+            config.write(configfile)
+    except EnvironmentError as e:
+        print(e.strerror)
 
 def init_parser():
     p = argparse.ArgumentParser(description =
@@ -69,10 +72,15 @@ def init_account():
     try:
         config.read_file(open(os.path.expanduser(CONFIG_PATH)))
         token = config['account']['token']
-    except:
-        print("Problem with the configuration file.")
+    except IOError as e:
+        print("Error with " + e.filename + ":")
+        print(e.strerror)
         print("Please run " + sys.argv[0] + " setup.")
-        exit(1)
+        sys.exit(1)
+    except KeyError as e:
+        print("Error with the config file structure.")
+        print("Please run " + sys.argv[0] + " setup.")
+        sys.exit(1)
 
     return putio2.Client(token)
 
@@ -81,13 +89,18 @@ def list_files(putio, args = None):
         files = putio.File.list(args.id)
     except Exception:
         print("Something went wrong on the server. Check the ID.")
-        exit(1)
+        sys.exit(1)
 
     for f in files:
         print(" {:>8}  {}".format(BOLD + str(f.id) + NC, f.name))
 
 def list_transfers(putio, args = None):
-    transfers = putio.Transfer.list()
+    try:
+        transfers = putio.Transfer.list()
+    except Exception:
+        print("Something went wrong on the server. Check the ID.")
+        sys.exit(1)
+
     for t in transfers:
         print(" {:>7}  {}".format(BOLD + str(t.id) + NC, t.name))
 
@@ -101,9 +114,9 @@ def tree_files(putio, args = None):
 
     try:
         files = putio.File.list(-1)
-    except:
+    except Exception:
         print("Could not list all file; server response was not valid.")
-        exit(1)
+        sys.exit(1)
 
     tree = collections.defaultdict(dict)
     for idx, f in enumerate(files):
@@ -113,9 +126,13 @@ def tree_files(putio, args = None):
 
 def download(putio, args):
     for i in args.id:
-        f = putio.File.get(i)
-        url = f.download(ext = True)
-        subprocess.call(["curl", "-J", "-O", url])
+        try:
+            f = putio.File.get(i)
+        except Exception:
+            print("Impossible to retrieve ID {}.".format(i))
+        else:
+            url = f.download(ext = True)
+            subprocess.call(["curl", "-J", "-O", url])
 
 def upload(putio, args):
     for f in args.file:
@@ -123,7 +140,10 @@ def upload(putio, args):
 
 def delete(putio, args):
     for i in args.id:
-        putio.File.get(i).delete()
+        try:
+            putio.File.get(i).delete()
+        except Exception:
+            print("Impossible to retrieve ID {}.".format(i))
 
 if __name__ == "__main__":
 
@@ -131,12 +151,12 @@ if __name__ == "__main__":
 
     if len(sys.argv) == 1:
         parser.print_help();
-        sys.exit(1)
+        sys.sys.exit(1)
     args = parser.parse_args()
 
     if args.cmd == 'setup':
         setup_account()
-        exit(0)
+        sys.exit(0)
 
     putio = init_account()
 
