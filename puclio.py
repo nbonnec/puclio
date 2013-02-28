@@ -41,28 +41,34 @@ def setup_account():
 def init_parser():
     p = argparse.ArgumentParser(description =
             "A Putio Utility, Command LIne Oriented.")
-    subparsers = p.add_subparsers(dest='cmd')
+    subparsers = p.add_subparsers(dest="cmd")
 
-    ls = subparsers.add_parser('ls', help = "list files")
+    ls = subparsers.add_parser("ls", help = "list files")
     ls.add_argument("-a", "--all", help = "show more informations",
-            action = "store_true")
-    ls.add_argument("id", type = int, nargs = '?', default = 0,
-            help = "ID to list")
+                    action = "store_true")
+    ls.add_argument("id", type = int, nargs = "?", default = 0,
+                    help = "ID to list")
 
-    lt = subparsers.add_parser('lt', help = "list transfers")
+    lt = subparsers.add_parser("lt", help = "list transfers")
 
     rm = subparsers.add_parser("rm", help = "delete a file")
-    rm.add_argument("id", type = int, nargs = '+', help = "ID to delete")
+    rm.add_argument("id", type = int, nargs = "+", help = "ID to delete")
 
-    tree = subparsers.add_parser('tree', help = "list files as a tree")
+    tree = subparsers.add_parser("tree", help = "list files as a tree")
 
-    up = subparsers.add_parser('up', help = "upload a file on put.io")
-    up.add_argument("file", type = str, nargs = '+',  help = "file to upload")
+    up = subparsers.add_parser("up", help = "upload a file on put.io")
+    up.add_argument("file", type = str, nargs = "+",  help = "file to upload")
 
-    dl = subparsers.add_parser('dl', help = "dowload files")
-    dl.add_argument("id", type = int, nargs = '+', help = "ID to dowload")
+    dl = subparsers.add_parser("dl", help = "dowload files")
+    dl.add_argument("id", type = int, nargs = "+", help = "ID to dowload")
 
-    setup = subparsers.add_parser('setup',
+    add = subparsers.add_parser("add",
+                                help = "add an url to the transfer list")
+    add.add_argument("--pid", help = "parent ID for the final file")
+
+    info = subparsers.add_parser("info", help = "get informations on account")
+
+    setup = subparsers.add_parser("setup",
             help = "setup your Oauth account")
     return p
 
@@ -145,13 +151,37 @@ def delete(putio, args):
         except Exception:
             print("Impossible to retrieve ID {}.".format(i))
 
+def add_transfer(putio, args):
+    for u in args.url:
+        putio.Transfer.add(u, args.pid, args.extract)
+
+def list_info(putio, args):
+    def sizeof_fmt(size):
+        for x in ['bytes', 'KB', 'MB', 'GB', 'TB']:
+            if size < 1024.0:
+                return "{:3.1f} {}".format(size, x)
+            size /= 1024
+
+    try:
+        infos = putio.Account.info()
+    except Exception:
+        print("Problem with the server.")
+
+    print()
+    print("{} ({})".format(infos.username, infos.mail))
+    print()
+    print("Disk infos:")
+    print("     avail: {:>10}".format(sizeof_fmt(infos.disk['avail'])))
+    print("     used:  {:>10}".format(sizeof_fmt(infos.disk['used'])))
+    print("     total: {:>10}".format(sizeof_fmt(infos.disk['size'])))
+
 if __name__ == "__main__":
 
     parser = init_parser()
 
     if len(sys.argv) == 1:
         parser.print_help();
-        sys.sys.exit(1)
+        sys.exit(1)
     args = parser.parse_args()
 
     if args.cmd == 'setup':
@@ -172,4 +202,8 @@ if __name__ == "__main__":
         upload(putio, args)
     elif args.cmd == 'lt':
         list_transfers(putio, args)
+    elif args.cmd == 'add':
+        add_transfer(putio, args)
+    elif args.cmd == 'info':
+        list_info(putio, args)
 
