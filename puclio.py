@@ -24,7 +24,8 @@ PUTIO_TOKEN_PATH = "http://put.io/v2/oauth2/apptoken/" + PUTIO_APP_ID
 BOLD = '[1m'
 NC = '[0m'
 
-def setup_account():
+def config():
+    """ Configure the Oauth token of the account """
     config = configparser.ConfigParser()
     tok = input("To get your Oauth token go to: " + PUTIO_TOKEN_PATH +
                 ".\nOauth token ? ")
@@ -39,40 +40,47 @@ def setup_account():
         print(e.strerror)
 
 def init_parser():
+    """ Initialize parser with all arguments and subcommands. """
     p = argparse.ArgumentParser(description =
             "A Putio Utility, Command LIne Oriented.")
-    subparsers = p.add_subparsers(dest="cmd")
 
-    ls = subparsers.add_parser("ls", help = "list files")
-    ls.add_argument("-a", "--all", help = "show more informations",
-                    action = "store_true")
-    ls.add_argument("id", type = int, nargs = "?", default = 0,
-                    help = "ID to list")
+    subparsers = p.add_subparsers(title="Commands", dest="cmd",
+                                  metavar="<command>")
 
-    lt = subparsers.add_parser("lt", help = "list transfers")
+    add = subparsers.add_parser("add", help="add an url to the transfer list")
+    add.add_argument("url", nargs="+", help="file's url to retrieve")
+    add.add_argument("--pid", help="parent ID for the final file")
 
-    rm = subparsers.add_parser("rm", help = "delete a file")
-    rm.add_argument("id", type = int, nargs = "+", help = "ID to delete")
+    config = subparsers.add_parser("config", help="config your Oauth account")
 
-    tree = subparsers.add_parser("tree", help = "list files as a tree")
+    dl = subparsers.add_parser("dl", help="dowload files")
+    dl.add_argument("id", type=int, nargs="+", help="ID to dowload")
+    dl.add_argument("-o", "--output", metavar="file", type=str,
+                    help="write output to file instead of"
+                         "the current directory")
 
-    up = subparsers.add_parser("up", help = "upload a file on put.io")
-    up.add_argument("file", type = str, nargs = "+",  help = "file to upload")
+    info = subparsers.add_parser("info", help="get informations on account")
 
-    dl = subparsers.add_parser("dl", help = "dowload files")
-    dl.add_argument("id", type = int, nargs = "+", help = "ID to dowload")
+    ls = subparsers.add_parser("ls", help="list files")
+    ls.add_argument("-a", "--all", help="list more informations",
+                    action="store_true")
+    ls.add_argument("id", type=int, nargs="?", default=0,
+                    help="ID to list")
 
-    add = subparsers.add_parser("add",
-                                help = "add an url to the transfer list")
-    add.add_argument("--pid", help = "parent ID for the final file")
+    lt = subparsers.add_parser("lt", help="list transfers")
 
-    info = subparsers.add_parser("info", help = "get informations on account")
+    rm = subparsers.add_parser("rm", help="delete a file")
+    rm.add_argument("id", type=int, nargs="+", help="ID to delete")
 
-    setup = subparsers.add_parser("setup",
-            help = "setup your Oauth account")
+    tree = subparsers.add_parser("tree", help="list files as a tree")
+
+    up = subparsers.add_parser("up", help="upload a file on put.io")
+    up.add_argument("file",  help="file to upload")
+
     return p
 
-def init_account():
+def get_client():
+    """ Get an instanciation of a Client object from the put.io API. """
     config = configparser.ConfigParser()
 
     try:
@@ -81,16 +89,17 @@ def init_account():
     except IOError as e:
         print("Error with " + e.filename + ":")
         print(e.strerror)
-        print("Please run " + sys.argv[0] + " setup.")
+        print("Please run " + sys.argv[0] + " config.")
         sys.exit(1)
     except KeyError as e:
         print("Error with the config file structure.")
-        print("Please run " + sys.argv[0] + " setup.")
+        print("Please run " + sys.argv[0] + " config.")
         sys.exit(1)
 
     return putio2.Client(token)
 
-def list_files(putio, args = None):
+def list_files(putio, args=None):
+    """ List client files with their IDs. """
     try:
         files = putio.File.list(args.id)
     except Exception:
@@ -98,9 +107,10 @@ def list_files(putio, args = None):
         sys.exit(1)
 
     for f in files:
-        print(" {:>8}  {}".format(BOLD + str(f.id) + NC, f.name))
+        print(" {:>8}  {}".format(BOLD + "(" + str(f.id) + ")" + NC, f.name))
 
-def list_transfers(putio, args = None):
+def list_transfers(putio, args=None):
+    """ List all transfers. """
     try:
         transfers = putio.Transfer.list()
     except Exception:
@@ -108,9 +118,10 @@ def list_transfers(putio, args = None):
         sys.exit(1)
 
     for t in transfers:
-        print(" {:>7}  {}".format(BOLD + str(t.id) + NC, t.name))
+        print(" {:>7}  {}".format(BOLD + "(" + str(t.id) + ")" + NC, t.name))
 
-def tree_files(putio, args = None):
+def tree_files(putio, args=None):
+    """ List all files as a tree. """
     # Maybe not print and search at the same time to improve formatting.
     def go_deep(tree, id, depth):
         for k, v in tree[id].items():
@@ -121,7 +132,7 @@ def tree_files(putio, args = None):
     try:
         files = putio.File.list(-1)
     except Exception:
-        print("Could not list all file; server response was not valid.")
+        print("Could not list all files; server response was not valid.")
         sys.exit(1)
 
     tree = collections.defaultdict(dict)
@@ -131,20 +142,29 @@ def tree_files(putio, args = None):
     go_deep(tree, 0, 0)
 
 def download(putio, args):
+    """ Download a file from put.io. """
+
+    if args.output and len(args.id) > 1:
+        print(sys.argv[0] +
+              ": error: -o, --output can only be set with one ID.")
+        sys.exit(1)
+
     for i in args.id:
         try:
             f = putio.File.get(i)
         except Exception:
             print("Impossible to retrieve ID {}.".format(i))
         else:
-            url = f.download(ext = True)
+            url = f.download(ext=True)
             subprocess.call(["curl", "-J", "-O", url])
 
 def upload(putio, args):
+    """ Upload a file to put.io. """
     for f in args.file:
         putio.File.upload(f, os.path.basename(f))
 
 def delete(putio, args):
+    """ Delete a file on put.io. """
     for i in args.id:
         try:
             putio.File.get(i).delete()
@@ -152,16 +172,19 @@ def delete(putio, args):
             print("Impossible to retrieve ID {}.".format(i))
 
 def add_transfer(putio, args):
+    """ Add a file to the transfer list, using an url. """
     for u in args.url:
-        putio.Transfer.add(u, args.pid, args.extract)
+        putio.Transfer.add(u, args.pid)
+
+def sizeof_fmt(size):
+    """ Get the byte size in a human readable way. """
+    for x in ['bytes', 'KB', 'MB', 'GB', 'TB']:
+        if size < 1024.0:
+            return "{:3.1f} {}".format(size, x)
+        size /= 1024
 
 def list_info(putio, args):
-    def sizeof_fmt(size):
-        for x in ['bytes', 'KB', 'MB', 'GB', 'TB']:
-            if size < 1024.0:
-                return "{:3.1f} {}".format(size, x)
-            size /= 1024
-
+    """ List informations about the account. """
     try:
         infos = putio.Account.info()
     except Exception:
@@ -184,11 +207,11 @@ if __name__ == "__main__":
         sys.exit(1)
     args = parser.parse_args()
 
-    if args.cmd == 'setup':
-        setup_account()
+    if args.cmd == 'config':
+        config()
         sys.exit(0)
 
-    putio = init_account()
+    putio = get_client()
 
     if args.cmd == 'ls':
         list_files(putio, args)
