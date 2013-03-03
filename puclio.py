@@ -12,6 +12,7 @@ import collections
 import configparser
 import logging
 import os
+import signal
 import subprocess
 import sys
 from ressources.lib.putio2 import putio2
@@ -206,7 +207,15 @@ def list_info(putio, args):
     print("     used:  {:>10}".format(sizeof_fmt(infos.disk['used'])))
     print("     total: {:>10}".format(sizeof_fmt(infos.disk['size'])))
 
+def sigint_handler(signal, frame):
+    """ Exit nicely on SIGINT. """
+
+    print("Program interrupted...")
+    sys.exit(0)
+
 if __name__ == "__main__":
+
+    signal.signal(signal.SIGINT, sigint_handler)
 
     parser = init_parser()
 
