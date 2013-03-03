@@ -16,6 +16,8 @@ import subprocess
 import sys
 from ressources.lib.putio2 import putio2
 
+VERSION = 0.1
+
 DIR_CONFIG_PATH = "~/.config/puclio"
 CONFIG_PATH = DIR_CONFIG_PATH + "/config"
 PUTIO_APP_ID = "337"
@@ -43,6 +45,8 @@ def init_parser():
     """ Initialize parser with all arguments and subcommands. """
     p = argparse.ArgumentParser(description =
             "A Putio Utility, Command LIne Oriented.")
+    p.add_argument("--version", action="version",
+                   version="puclio version {}".format(VERSION))
 
     subparsers = p.add_subparsers(title="Commands", dest="cmd",
                                   metavar="<command>")
