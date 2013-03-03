@@ -48,6 +48,9 @@ def init_parser():
     p.add_argument("--version", action="version",
                    version="puclio version {}".format(VERSION))
 
+    p.add_argument("--debug", action="store_true",
+                   help = "print debug informations")
+
     subparsers = p.add_subparsers(title="Commands", dest="cmd",
                                   metavar="<command>")
 
@@ -193,6 +196,7 @@ def list_info(putio, args):
         infos = putio.Account.info()
     except Exception:
         print("Problem with the server.")
+        sys.exit(1)
 
     print()
     print("{} ({})".format(infos.username, infos.mail))
@@ -209,7 +213,11 @@ if __name__ == "__main__":
     if len(sys.argv) == 1:
         parser.print_help();
         sys.exit(1)
+
     args = parser.parse_args()
+
+    if args.debug:
+        logging.basicConfig(level=logging.DEBUG)
 
     if args.cmd == 'config':
         config()
