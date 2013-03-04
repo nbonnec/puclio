@@ -1,4 +1,4 @@
-#!/usr/bin/python3
+#!/usr/bin/env python3
 
 #
 # A Putio Utility, Command LIne Oriented.
@@ -160,7 +160,7 @@ def download(putio, args):
             print("Impossible to retrieve ID {}.".format(i))
         else:
             url = f.download(ext=True)
-            subprocess.call(["curl", "-J", "-O", url])
+            subprocess.call(["wget", "--content-disposition", url])
 
 def upload(putio, args):
     """ Upload a file to put.io. """
