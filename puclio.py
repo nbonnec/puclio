@@ -12,6 +12,7 @@ import collections
 import configparser
 import logging
 import os
+import signal
 import subprocess
 import sys
 from ressources.lib.putio2 import putio2
@@ -47,6 +48,9 @@ def init_parser():
             "A Putio Utility, Command LIne Oriented.")
     p.add_argument("--version", action="version",
                    version="puclio version {}".format(VERSION))
+
+    p.add_argument("--debug", action="store_true",
+                   help = "print debug informations")
 
     subparsers = p.add_subparsers(title="Commands", dest="cmd",
                                   metavar="<command>")
@@ -193,6 +197,7 @@ def list_info(putio, args):
         infos = putio.Account.info()
     except Exception:
         print("Problem with the server.")
+        sys.exit(1)
 
     print()
     print("{} ({})".format(infos.username, infos.mail))
@@ -201,6 +206,12 @@ def list_info(putio, args):
     print("     avail: {:>10}".format(sizeof_fmt(infos.disk['avail'])))
     print("     used:  {:>10}".format(sizeof_fmt(infos.disk['used'])))
     print("     total: {:>10}".format(sizeof_fmt(infos.disk['size'])))
+
+def sigint_handler(signal, frame):
+    """ Exit nicely on SIGINT. """
+
+    print("Program interrupted...")
+    sys.exit(0)
 
 commands = {
     'add': add_transfer,
@@ -215,12 +226,18 @@ commands = {
 
 if __name__ == "__main__":
 
+    signal.signal(signal.SIGINT, sigint_handler)
+
     parser = init_parser()
 
     if len(sys.argv) == 1:
         parser.print_help();
         sys.exit(1)
+
     args = parser.parse_args()
+
+    if args.debug:
+        logging.basicConfig(level=logging.DEBUG)
 
     if args.cmd == 'config':
         config()
