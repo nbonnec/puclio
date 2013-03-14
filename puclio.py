@@ -202,6 +202,17 @@ def list_info(putio, args):
     print("     used:  {:>10}".format(sizeof_fmt(infos.disk['used'])))
     print("     total: {:>10}".format(sizeof_fmt(infos.disk['size'])))
 
+commands = {
+    'add': add_transfer,
+    'dl': download,
+    'info': list_info,
+    'ls': list_files,
+    'lt': list_transfers,
+    'rm': delete,
+    'tree': tree_files,
+    'up': upload
+}
+
 if __name__ == "__main__":
 
     parser = init_parser()
@@ -217,20 +228,6 @@ if __name__ == "__main__":
 
     putio = get_client()
 
-    if args.cmd == 'ls':
-        list_files(putio, args)
-    elif args.cmd == 'tree':
-        tree_files(putio, args)
-    elif args.cmd == 'dl':
-        download(putio, args)
-    elif args.cmd == 'rm':
-        delete(putio, args)
-    elif args.cmd == 'up':
-        upload(putio, args)
-    elif args.cmd == 'lt':
-        list_transfers(putio, args)
-    elif args.cmd == 'add':
-        add_transfer(putio, args)
-    elif args.cmd == 'info':
-        list_info(putio, args)
+    if args.cmd in commands:
+        commands[args.cmd](putio, args)
 
