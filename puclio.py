@@ -6,6 +6,7 @@
 # TODO:
 #       - manage bad token,
 #       - prettier tree.
+#       - too much sys.exit
 
 import argparse
 import collections
@@ -23,9 +24,13 @@ DIR_CONFIG_PATH = "~/.config/puclio"
 CONFIG_PATH = DIR_CONFIG_PATH + "/config"
 PUTIO_APP_ID = "337"
 PUTIO_TOKEN_PATH = "http://put.io/v2/oauth2/apptoken/" + PUTIO_APP_ID
+ID_SIZE = 7
 
 BOLD = '[1m'
 NC = '[0m'
+
+file_alias = {}
+is_interactive = False
 
 def config():
     """ Configure the Oauth token of the account """
@@ -108,14 +113,30 @@ def get_client():
 
 def list_files(putio, args=None):
     """ List client files with their IDs. """
+    if is_interactive and args.id > 0:
+        try:
+            args.id = file_alias[args.id]
+        except KeyError:
+            pass
+
     try:
         files = putio.File.list(args.id)
     except Exception:
         print("Something went wrong on the server. Check the ID.")
-        sys.exit(1)
+        return 1
 
-    for f in files:
-        print(" {:>8}  {}".format(BOLD + "(" + str(f.id) + ")" + NC, f.name))
+    if is_interactive:
+        file_alias.clear()
+
+    for i, f in enumerate(files):
+        if is_interactive:
+            idx = "(" + str(i + 1) + ")"
+            file_alias[i + 1] = f.id
+        else:
+            idx = "(" + str(f.id + 1) + ")"
+        print(" {}  {}".format(
+            BOLD + str(idx).rjust(5 if is_interactive else 10) + NC,
+            f.name))
 
 def list_transfers(putio, args=None):
     """ List all transfers. """
@@ -123,7 +144,7 @@ def list_transfers(putio, args=None):
         transfers = putio.Transfer.list()
     except Exception:
         print("Something went wrong on the server. Check the ID.")
-        sys.exit(1)
+        return 1
 
     for t in transfers:
         print(" {:>7}  {}".format(BOLD + "(" + str(t.id) + ")" + NC, t.name))
@@ -141,7 +162,7 @@ def tree_files(putio, args=None):
         files = putio.File.list(-1)
     except Exception:
         print("Could not list all files; server response was not valid.")
-        sys.exit(1)
+        return 1
 
     tree = collections.defaultdict(dict)
     for idx, f in enumerate(files):
@@ -152,10 +173,18 @@ def tree_files(putio, args=None):
 def download(putio, args):
     """ Download a file from put.io. """
 
+    if is_interactive:
+        for idx, i in enumerate(args.id):
+            if i > 0:
+                try:
+                    args.id[idx] = file_alias[i]
+                except KeyError:
+                    pass
+
     if args.output and len(args.id) > 1:
         print(sys.argv[0] +
               ": error: -o, --output can only be set with one ID.")
-        sys.exit(1)
+        return 1
 
     for i in args.id:
         try:
@@ -173,6 +202,14 @@ def upload(putio, args):
 
 def delete(putio, args):
     """ Delete a file on put.io. """
+    if is_interactive:
+        for idx, i in enumerate(args.id):
+            if i > 0:
+                try:
+                    args.id[idx] = file_alias[i]
+                except KeyError:
+                    pass
+
     for i in args.id:
         try:
             putio.File.get(i).delete()
@@ -197,7 +234,7 @@ def list_info(putio, args):
         infos = putio.Account.info()
     except Exception:
         print("Problem with the server.")
-        sys.exit(1)
+        return 1
 
     print()
     print("{} ({})".format(infos.username, infos.mail))
@@ -213,16 +250,38 @@ def sigint_handler(signal, frame):
     print("Program interrupted...")
     sys.exit(0)
 
-commands = {
-    'add': add_transfer,
-    'dl': download,
-    'info': list_info,
-    'ls': list_files,
-    'lt': list_transfers,
-    'rm': delete,
-    'tree': tree_files,
-    'up': upload
-}
+def run_interactive(parser):
+    putio = get_client()
+    while True:
+        try:
+            cli = input("puclio> ")
+        except EOFError:
+            print()
+            break;
+        try:
+            args = parser.parse_args(cli.split())
+        except SystemExit:
+            # don't exit when help is print
+            pass
+        else:
+            run_command(args)
+
+def run_command(args):
+    commands = {
+        'add': add_transfer,
+        'dl': download,
+        'info': list_info,
+        'ls': list_files,
+        'lt': list_transfers,
+        'rm': delete,
+        'tree': tree_files,
+        'up': upload
+    }
+
+    putio = get_client()
+
+    if args.cmd in commands:
+        commands[args.cmd](putio, args)
 
 if __name__ == "__main__":
 
@@ -231,8 +290,9 @@ if __name__ == "__main__":
     parser = init_parser()
 
     if len(sys.argv) == 1:
-        parser.print_help();
-        sys.exit(1)
+        is_interactive = True
+        run_interactive(parser)
+        sys.exit(0)
 
     args = parser.parse_args()
 
@@ -243,8 +303,5 @@ if __name__ == "__main__":
         config()
         sys.exit(0)
 
-    putio = get_client()
-
-    if args.cmd in commands:
-        commands[args.cmd](putio, args)
+    sys.exit(run_command(args))
 
