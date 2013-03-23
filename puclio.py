@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
+#-*-coding:utf-8-*-
 
 #
-# A Putio Utility, Command LIne Oriented.
+# A putio2. Utility, Command LIne Oriented.
 #
 # TODO:
 #       - manage bad token,
@@ -17,6 +18,8 @@ import signal
 import subprocess
 import sys
 from ressources.lib.putio2 import putio2
+
+logger = logging.getLogger(__name__)
 
 VERSION = 0.1
 
@@ -99,6 +102,7 @@ def get_client():
     try:
         config.read_file(open(os.path.expanduser(CONFIG_PATH)))
         token = config['account']['token']
+        logger.debug("token: {}".format(token))
     except IOError as e:
         print("Error with " + e.filename + ":")
         print(e.strerror)
@@ -121,7 +125,7 @@ def list_files(putio, args=None):
 
     try:
         files = putio.File.list(args.id)
-    except Exception:
+    except (putio2.StatusError, putio2.JSONError):
         print("Something went wrong on the server. Check the ID.")
         return 1
 
@@ -142,7 +146,7 @@ def list_transfers(putio, args=None):
     """ List all transfers. """
     try:
         transfers = putio.Transfer.list()
-    except Exception:
+    except (putio2.StatusError, putio2.JSONError):
         print("Something went wrong on the server. Check the ID.")
         return 1
 
@@ -160,7 +164,7 @@ def tree_files(putio, args=None):
 
     try:
         files = putio.File.list(-1)
-    except Exception:
+    except (putio2.StatusError, putio2.JSONError):
         print("Could not list all files; server response was not valid.")
         return 1
 
@@ -189,7 +193,7 @@ def download(putio, args):
     for i in args.id:
         try:
             f = putio.File.get(i)
-        except Exception:
+        except (putio2.StatusError, putio2.JSONError):
             print("Impossible to retrieve ID {}.".format(i))
         else:
             url = f.download(ext=True)
@@ -213,7 +217,7 @@ def delete(putio, args):
     for i in args.id:
         try:
             putio.File.get(i).delete()
-        except Exception:
+        except (putio2.StatusError, putio2.JSONError):
             print("Impossible to retrieve ID {}.".format(i))
 
 def add_transfer(putio, args):
@@ -232,7 +236,7 @@ def list_info(putio, args):
     """ List informations about the account. """
     try:
         infos = putio.Account.info()
-    except Exception:
+    except (putio2.StatusError, putio2.JSONError):
         print("Problem with the server.")
         return 1
 
