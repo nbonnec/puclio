@@ -22,6 +22,7 @@ from ressources.lib.putio2 import putio2
 logger = logging.getLogger(__name__)
 
 DESCRIPTION = "A Putio Utility, Command LIne Oriented."
+SOURCE = "https://github.com/thevegeta/puclio"
 VERSION = "0.2"
 
 DIR_CONFIG_PATH = "~/.config/puclio"
@@ -40,7 +41,8 @@ def config():
     """ Configure the Oauth token of the account """
     config = configparser.ConfigParser()
     tok = input("To get your Oauth token go to: " + PUTIO_TOKEN_PATH +
-                ".\nOauth token ? ")
+                ".\nYOUR TOKEN WILL BE STORE IN PLAIN TEXT !"
+                "\nOauth token ? ")
     config.add_section('account')
     config.set('account', 'token', tok)
     try:
@@ -53,18 +55,21 @@ def config():
 
 def init_parser():
     """ Initialize parser with all arguments and subcommands. """
-    p = argparse.ArgumentParser(description = DESCRIPTION)
-    p.add_argument("--version", action="version",
+    p = argparse.ArgumentParser(description = DESCRIPTION + "\n\n" +
+                                SOURCE,
+                                formatter_class=argparse.RawTextHelpFormatter)
+    p.add_argument("-v", "--version", action="version",
                    version="puclio version {}".format(VERSION))
 
-    p.add_argument("--debug", action="store_true",
+    p.add_argument("-d", "--debug", action="store_true",
                    help = "print debug informations")
 
     subparsers = p.add_subparsers(title="Commands", dest="cmd",
-                                  metavar="<command>")
+                                  metavar="[<command>]")
 
     add = subparsers.add_parser("add", help="add an url to the transfer list")
-    add.add_argument("url", nargs="+", help="file's url to retrieve")
+    add.add_argument("url", nargs="+", help="file's url to retrieve"
+                        " (put quotes to avoid problems with your console).")
     add.add_argument("--pid", help="parent ID for the final file")
 
     config = subparsers.add_parser("config", help="config your Oauth account")
@@ -88,7 +93,7 @@ def init_parser():
     rm = subparsers.add_parser("rm", help="delete a file")
     rm.add_argument("id", type=int, nargs="+", help="ID to delete")
 
-    tree = subparsers.add_parser("tree", help="list files as a tree")
+    tree = subparsers.add_parser("tree", help="list files as an (ugly) tree")
 
     up = subparsers.add_parser("up", help="upload a file on put.io")
     up.add_argument("file",  help="file to upload")
@@ -137,7 +142,7 @@ def list_files(putio, args=None):
             idx = "(" + str(i + 1) + ")"
             file_alias[i + 1] = f.id
         else:
-            idx = "(" + str(f.id + 1) + ")"
+            idx = "(" + str(f.id) + ")"
         print(" {}  {}".format(
             BOLD + str(idx).rjust(5 if is_interactive else 10) + NC,
             f.name))
@@ -170,7 +175,7 @@ def tree_files(putio, args=None):
 
     tree = collections.defaultdict(dict)
     for idx, f in enumerate(files):
-        tree[f.parent_id][f.id] = f.name
+        tree[f.parent_id][f.id] = "{} ({})".format(f.name, f.id)
     print(".")
     go_deep(tree, 0, 0)
 
