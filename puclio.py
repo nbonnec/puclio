@@ -21,7 +21,8 @@ from ressources.lib.putio2 import putio2
 
 logger = logging.getLogger(__name__)
 
-VERSION = 0.1
+DESCRIPTION = "A Putio Utility, Command LIne Oriented."
+VERSION = "0.2"
 
 DIR_CONFIG_PATH = "~/.config/puclio"
 CONFIG_PATH = DIR_CONFIG_PATH + "/config"
@@ -52,8 +53,7 @@ def config():
 
 def init_parser():
     """ Initialize parser with all arguments and subcommands. """
-    p = argparse.ArgumentParser(description =
-            "A Putio Utility, Command LIne Oriented.")
+    p = argparse.ArgumentParser(description = DESCRIPTION)
     p.add_argument("--version", action="version",
                    version="puclio version {}".format(VERSION))
 
