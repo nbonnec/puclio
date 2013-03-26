@@ -96,7 +96,7 @@ def init_parser():
     tree = subparsers.add_parser("tree", help="list files as an (ugly) tree")
 
     up = subparsers.add_parser("up", help="upload a file on put.io")
-    up.add_argument("file",  help="file to upload")
+    up.add_argument("file", nargs="+", help="file to upload")
 
     return p
 
@@ -109,8 +109,7 @@ def get_client():
         token = config['account']['token']
         logger.debug("token: {}".format(token))
     except IOError as e:
-        print("Error with " + e.filename + ":")
-        print(e.strerror)
+        print("Error with " + e.filename + ": " + e.strerror)
         print("Please run " + sys.argv[0] + " config.")
         sys.exit(1)
     except KeyError as e:
@@ -147,6 +146,8 @@ def list_files(putio, args=None):
             BOLD + str(idx).rjust(5 if is_interactive else 10) + NC,
             f.name))
 
+    return 0
+
 def list_transfers(putio, args=None):
     """ List all transfers. """
     try:
@@ -157,6 +158,8 @@ def list_transfers(putio, args=None):
 
     for t in transfers:
         print(" {:>7}  {}".format(BOLD + "(" + str(t.id) + ")" + NC, t.name))
+
+    return 0
 
 def tree_files(putio, args=None):
     """ List all files as a tree. """
@@ -179,6 +182,8 @@ def tree_files(putio, args=None):
     print(".")
     go_deep(tree, 0, 0)
 
+    return 0
+
 def download(putio, args):
     """ Download a file from put.io. """
 
@@ -195,19 +200,33 @@ def download(putio, args):
               ": error: -o, --output can only be set with one ID.")
         return 1
 
+    err = 0
     for i in args.id:
         try:
             f = putio.File.get(i)
         except (putio2.StatusError, putio2.JSONError):
             print("Impossible to retrieve ID {}.".format(i))
+            err = 1
         else:
             url = f.download(ext=True)
             subprocess.call(["wget", "--content-disposition", url])
 
+    return err
+
 def upload(putio, args):
-    """ Upload a file to put.io. """
+    """ Upload files to put.io. """
+    err = 0
     for f in args.file:
-        putio.File.upload(f, os.path.basename(f))
+        try:
+            putio.File.upload(f, os.path.basename(f))
+        except (putio2.StatusError, putio2.JSONError):
+            print("Problem with the server.")
+            err = 1
+        except IOError as e:
+            print("Error with " + e.filename + ": " + e.strerror)
+            err = 1
+
+    return err
 
 def delete(putio, args):
     """ Delete a file on put.io. """
@@ -219,16 +238,27 @@ def delete(putio, args):
                 except KeyError:
                     pass
 
+    err = 0
     for i in args.id:
         try:
             putio.File.get(i).delete()
         except (putio2.StatusError, putio2.JSONError):
             print("Impossible to retrieve ID {}.".format(i))
+            err = 1
+
+    return err
 
 def add_transfer(putio, args):
     """ Add a file to the transfer list, using an url. """
+    err = 0
     for u in args.url:
-        putio.Transfer.add(u, args.pid)
+        try:
+            putio.Transfer.add(u, args.pid)
+        except (putio2.StatusError, putio2.JSONError):
+            print("Problem with the server.")
+            err = 1
+
+    return err
 
 def sizeof_fmt(size):
     """ Get the byte size in a human readable way. """
@@ -290,7 +320,7 @@ def run_command(args):
     putio = get_client()
 
     if args.cmd in commands:
-        commands[args.cmd](putio, args)
+        return commands[args.cmd](putio, args)
 
 if __name__ == "__main__":
 
