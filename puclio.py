@@ -7,7 +7,6 @@
 # TODO:
 #       - manage bad token,
 #       - prettier tree.
-#       - too much sys.exit
 
 import argparse
 import collections
@@ -31,11 +30,181 @@ PUTIO_APP_ID = "337"
 PUTIO_TOKEN_PATH = "http://put.io/v2/oauth2/apptoken/" + PUTIO_APP_ID
 ID_SIZE = 7
 
-BOLD = '[1m'
-NC = '[0m'
+class Console:
 
-file_alias = {}
-is_interactive = False
+    BOLD = '[1m'
+    NC = '[0m'
+
+    def __init__(self, interactive=False):
+        self.is_interactive = interactive
+        self.client = get_client()
+        self.file_alias = list()
+
+    def list_files(self, args=None):
+        """ List client files with their IDs. """
+        if self.is_interactive and args.id > 0:
+            try:
+                args.id = self.file_alias[args.id]
+            except KeyError:
+                pass
+
+        try:
+            files = self.client.File.list(args.id)
+        except (putio2.StatusError, putio2.JSONError):
+            print("Something went wrong on the server. Check the ID.")
+            return 1
+
+        if self.is_interactive:
+            self.file_alias.clear()
+
+        for i, f in enumerate(files):
+            if self.is_interactive:
+                idx = "(" + str(i + 1) + ")"
+                self.file_alias[i + 1] = f.id
+            else:
+                idx = "(" + str(f.id) + ")"
+            print(" {}  {}".format(
+                self.BOLD +
+                str(idx).rjust(5 if self.is_interactive else 10) + self.NC,
+                f.name))
+
+        return 0
+
+    def list_transfers(self, args=None):
+        """ List all transfers. """
+        try:
+            transfers = self.client.Transfer.list()
+        except (putio2.StatusError, putio2.JSONError):
+            print("Something went wrong on the server. Check the ID.")
+            return 1
+
+        for t in transfers:
+            print(" {:>7}  {}".format(
+                self.BOLD + "(" + str(t.id) + ")" + self.NC, t.name))
+
+        return 0
+
+    def tree_files(self, args=None):
+        """ List all files as a tree. """
+        # Maybe not print and search at the same time to improve formatting.
+        def go_deep(tree, id, depth):
+            for k, v in tree[id].items():
+                print("|" + "    |" * depth + "––– " + v)
+                if k in tree:
+                    go_deep(tree, k, depth + 1)
+
+        try:
+            files = self.client.File.list(-1)
+        except (putio2.StatusError, putio2.JSONError):
+            print("Could not list all files; server response was not valid.")
+            return 1
+
+        tree = collections.defaultdict(dict)
+        for idx, f in enumerate(files):
+            tree[f.parent_id][f.id] = "{} ({})".format(f.name, f.id)
+        print(".")
+        go_deep(tree, 0, 0)
+
+        return 0
+
+    def download(self, args):
+        """ Download a file from put.io. """
+
+        if self.is_interactive:
+            for idx, i in enumerate(args.id):
+                if i > 0:
+                    try:
+                        args.id[idx] = self.file_alias[i]
+                    except KeyError:
+                        pass
+
+        if args.output and len(args.id) > 1:
+            print(sys.argv[0] +
+                  ": error: -o, --output can only be set with one ID.")
+            return 1
+
+        err = 0
+        for i in args.id:
+            try:
+                f = self.client.File.get(i)
+            except (putio2.StatusError, putio2.JSONError):
+                print("Impossible to retrieve ID {}.".format(i))
+                err = 1
+            else:
+                url = f.download(ext=True)
+                subprocess.call(["wget", "--content-disposition", url])
+
+        return err
+
+    def upload(self, args):
+        """ Upload files to put.io. """
+        err = 0
+        for f in args.file:
+            try:
+                self.client.File.upload(f, os.path.basename(f))
+            except (putio2.StatusError, putio2.JSONError):
+                print("Problem with the server.")
+                err = 1
+            except IOError as e:
+                print("Error with " + e.filename + ": " + e.strerror)
+                err = 1
+
+        return err
+
+    def delete(self, args):
+        """ Delete a file on put.io. """
+        if self.is_interactive:
+            for idx, i in enumerate(args.id):
+                if i > 0:
+                    try:
+                        args.id[idx] = self.file_alias[i]
+                    except KeyError:
+                        pass
+
+        err = 0
+        for i in args.id:
+            try:
+                self.client.File.get(i).delete()
+            except (putio2.StatusError, putio2.JSONError):
+                print("Impossible to retrieve ID {}.".format(i))
+                err = 1
+
+        return err
+
+    def add_transfer(self, args):
+        """ Add a file to the transfer list, using an url. """
+        err = 0
+        for u in args.url:
+            try:
+                self.client.Transfer.add(u, args.pid)
+            except (putio2.StatusError, putio2.JSONError):
+                print("Problem with the server.")
+                err = 1
+
+        return err
+
+    def list_info(self, args):
+        """ List informations about the account. """
+        try:
+            infos = self.client.Account.info()
+        except (putio2.StatusError, putio2.JSONError):
+            print("Problem with the server.")
+            return 1
+
+        print()
+        print("{} ({})".format(infos.username, infos.mail))
+        print()
+        print("Disk infos:")
+        print("     avail: {:>10}".format(sizeof_fmt(infos.disk['avail'])))
+        print("     used:  {:>10}".format(sizeof_fmt(infos.disk['used'])))
+        print("     total: {:>10}".format(sizeof_fmt(infos.disk['size'])))
+
+    def sizeof_fmt(self, size):
+        """ Get the byte size in a human readable way. """
+        for x in ['bytes', 'KB', 'MB', 'GB', 'TB']:
+            if size < 1024.0:
+                return "{:3.1f} {}".format(size, x)
+            size /= 1024
 
 def config():
     """ Configure the Oauth token of the account """
@@ -119,170 +288,6 @@ def get_client():
 
     return putio2.Client(token)
 
-def list_files(putio, args=None):
-    """ List client files with their IDs. """
-    if is_interactive and args.id > 0:
-        try:
-            args.id = file_alias[args.id]
-        except KeyError:
-            pass
-
-    try:
-        files = putio.File.list(args.id)
-    except (putio2.StatusError, putio2.JSONError):
-        print("Something went wrong on the server. Check the ID.")
-        return 1
-
-    if is_interactive:
-        file_alias.clear()
-
-    for i, f in enumerate(files):
-        if is_interactive:
-            idx = "(" + str(i + 1) + ")"
-            file_alias[i + 1] = f.id
-        else:
-            idx = "(" + str(f.id) + ")"
-        print(" {}  {}".format(
-            BOLD + str(idx).rjust(5 if is_interactive else 10) + NC,
-            f.name))
-
-    return 0
-
-def list_transfers(putio, args=None):
-    """ List all transfers. """
-    try:
-        transfers = putio.Transfer.list()
-    except (putio2.StatusError, putio2.JSONError):
-        print("Something went wrong on the server. Check the ID.")
-        return 1
-
-    for t in transfers:
-        print(" {:>7}  {}".format(BOLD + "(" + str(t.id) + ")" + NC, t.name))
-
-    return 0
-
-def tree_files(putio, args=None):
-    """ List all files as a tree. """
-    # Maybe not print and search at the same time to improve formatting.
-    def go_deep(tree, id, depth):
-        for k, v in tree[id].items():
-            print("|" + "    |" * depth + "––– " + v)
-            if k in tree:
-                go_deep(tree, k, depth + 1)
-
-    try:
-        files = putio.File.list(-1)
-    except (putio2.StatusError, putio2.JSONError):
-        print("Could not list all files; server response was not valid.")
-        return 1
-
-    tree = collections.defaultdict(dict)
-    for idx, f in enumerate(files):
-        tree[f.parent_id][f.id] = "{} ({})".format(f.name, f.id)
-    print(".")
-    go_deep(tree, 0, 0)
-
-    return 0
-
-def download(putio, args):
-    """ Download a file from put.io. """
-
-    if is_interactive:
-        for idx, i in enumerate(args.id):
-            if i > 0:
-                try:
-                    args.id[idx] = file_alias[i]
-                except KeyError:
-                    pass
-
-    if args.output and len(args.id) > 1:
-        print(sys.argv[0] +
-              ": error: -o, --output can only be set with one ID.")
-        return 1
-
-    err = 0
-    for i in args.id:
-        try:
-            f = putio.File.get(i)
-        except (putio2.StatusError, putio2.JSONError):
-            print("Impossible to retrieve ID {}.".format(i))
-            err = 1
-        else:
-            url = f.download(ext=True)
-            subprocess.call(["wget", "--content-disposition", url])
-
-    return err
-
-def upload(putio, args):
-    """ Upload files to put.io. """
-    err = 0
-    for f in args.file:
-        try:
-            putio.File.upload(f, os.path.basename(f))
-        except (putio2.StatusError, putio2.JSONError):
-            print("Problem with the server.")
-            err = 1
-        except IOError as e:
-            print("Error with " + e.filename + ": " + e.strerror)
-            err = 1
-
-    return err
-
-def delete(putio, args):
-    """ Delete a file on put.io. """
-    if is_interactive:
-        for idx, i in enumerate(args.id):
-            if i > 0:
-                try:
-                    args.id[idx] = file_alias[i]
-                except KeyError:
-                    pass
-
-    err = 0
-    for i in args.id:
-        try:
-            putio.File.get(i).delete()
-        except (putio2.StatusError, putio2.JSONError):
-            print("Impossible to retrieve ID {}.".format(i))
-            err = 1
-
-    return err
-
-def add_transfer(putio, args):
-    """ Add a file to the transfer list, using an url. """
-    err = 0
-    for u in args.url:
-        try:
-            putio.Transfer.add(u, args.pid)
-        except (putio2.StatusError, putio2.JSONError):
-            print("Problem with the server.")
-            err = 1
-
-    return err
-
-def sizeof_fmt(size):
-    """ Get the byte size in a human readable way. """
-    for x in ['bytes', 'KB', 'MB', 'GB', 'TB']:
-        if size < 1024.0:
-            return "{:3.1f} {}".format(size, x)
-        size /= 1024
-
-def list_info(putio, args):
-    """ List informations about the account. """
-    try:
-        infos = putio.Account.info()
-    except (putio2.StatusError, putio2.JSONError):
-        print("Problem with the server.")
-        return 1
-
-    print()
-    print("{} ({})".format(infos.username, infos.mail))
-    print()
-    print("Disk infos:")
-    print("     avail: {:>10}".format(sizeof_fmt(infos.disk['avail'])))
-    print("     used:  {:>10}".format(sizeof_fmt(infos.disk['used'])))
-    print("     total: {:>10}".format(sizeof_fmt(infos.disk['size'])))
-
 def sigint_handler(signal, frame):
     """ Exit nicely on SIGINT. """
 
@@ -290,7 +295,9 @@ def sigint_handler(signal, frame):
     sys.exit(0)
 
 def run_interactive(parser):
-    putio = get_client()
+
+    console = Console(interactive=True)
+
     while True:
         try:
             cli = input("puclio> ")
@@ -303,24 +310,24 @@ def run_interactive(parser):
             # don't exit when help is print
             pass
         else:
-            run_command(args)
+            run_command(console, args)
 
-def run_command(args):
+def run_command(console, args):
     commands = {
-        'add': add_transfer,
-        'dl': download,
-        'info': list_info,
-        'ls': list_files,
-        'lt': list_transfers,
-        'rm': delete,
-        'tree': tree_files,
-        'up': upload
+        'add': "add_transfer",
+        'dl': "download",
+        'info': "list_info",
+        'ls': "list_files",
+        'lt': "list_transfers",
+        'rm': "delete",
+        'tree': "tree_files",
+        'up': "upload"
     }
 
-    putio = get_client()
-
-    if args.cmd in commands:
-        return commands[args.cmd](putio, args)
+    try:
+        getattr(console, commands[args.cmd])(args)
+    except AttributeError:
+        print("The command does not exist, please report this bug.")
 
 if __name__ == "__main__":
 
@@ -329,7 +336,6 @@ if __name__ == "__main__":
     parser = init_parser()
 
     if len(sys.argv) == 1:
-        is_interactive = True
         run_interactive(parser)
         sys.exit(0)
 
@@ -342,5 +348,6 @@ if __name__ == "__main__":
         config()
         sys.exit(0)
 
-    sys.exit(run_command(args))
+    console = Console()
+    sys.exit(run_command(console, args))
 
