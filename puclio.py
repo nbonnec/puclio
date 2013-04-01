@@ -68,7 +68,7 @@ class Console:
         self.client = get_client()
         self.file_alias = list()
 
-    def list_files(self, args=None):
+    def list_files(self, args):
         """ List client files with their IDs. """
         if self.is_interactive and args.id > 0:
             try:
@@ -79,7 +79,8 @@ class Console:
         try:
             files = self.client.File.list(args.id)
         except (putio2.StatusError, putio2.JSONError):
-            print("Something went wrong on the server. Check the ID.")
+            print("Something went wrong on the server. Check the ID.",
+                    file=sys.stderr)
             return 1
 
         if self.is_interactive:
@@ -103,7 +104,8 @@ class Console:
         try:
             transfers = self.client.Transfer.list()
         except (putio2.StatusError, putio2.JSONError):
-            print("Something went wrong on the server. Check the ID.")
+            print("Something went wrong on the server. Check the ID.",
+                    file=sys.stderr)
             return 1
 
         for t in transfers:
@@ -124,7 +126,8 @@ class Console:
         try:
             files = self.client.File.list(-1)
         except (putio2.StatusError, putio2.JSONError):
-            print("Could not list all files; server response was not valid.")
+            print("Could not list all files; server response was not valid.",
+                    file=sys.stderr)
             return 1
 
         tree = collections.defaultdict(dict)
@@ -148,7 +151,8 @@ class Console:
 
         if args.output and len(args.id) > 1:
             print(sys.argv[0] +
-                  ": error: -o, --output can only be set with one ID.")
+                  ": error: -o, --output can only be set with one ID.",
+                    file=sys.stderr)
             return 1
 
         err = 0
@@ -156,7 +160,8 @@ class Console:
             try:
                 f = self.client.File.get(i)
             except (putio2.StatusError, putio2.JSONError):
-                print("Impossible to retrieve ID {}.".format(i))
+                print("Impossible to retrieve ID {}.".format(i),
+                        file=sys.stderr)
                 err = 1
             else:
                 url = f.download(ext=True)
@@ -171,10 +176,12 @@ class Console:
             try:
                 self.client.File.upload(f, os.path.basename(f))
             except (putio2.StatusError, putio2.JSONError):
-                print("Problem with the server.")
+                print("Problem with the server.",
+                        file=sys.stderr)
                 err = 1
             except IOError as e:
-                print("Error with " + e.filename + ": " + e.strerror)
+                print("Error with " + e.filename + ": " + e.strerror,
+                    file=sys.stderr)
                 err = 1
 
         return err
@@ -194,7 +201,8 @@ class Console:
             try:
                 self.client.File.get(i).delete()
             except (putio2.StatusError, putio2.JSONError):
-                print("Impossible to retrieve ID {}.".format(i))
+                print("Impossible to retrieve ID {}.".format(i),
+                        file=sys.stderr)
                 err = 1
 
         return err
@@ -206,7 +214,8 @@ class Console:
             try:
                 self.client.Transfer.add(u, args.pid)
             except (putio2.StatusError, putio2.JSONError):
-                print("Problem with the server.")
+                print("Problem with the server.",
+                        file=sys.stderr)
                 err = 1
 
         return err
@@ -216,16 +225,17 @@ class Console:
         try:
             infos = self.client.Account.info()
         except (putio2.StatusError, putio2.JSONError):
-            print("Problem with the server.")
+            print("Problem with the server.",
+                    file=sys.stderr)
             return 1
 
         print()
         print("{} ({})".format(infos.username, infos.mail))
         print()
         print("Disk infos:")
-        print("     avail: {:>10}".format(sizeof_fmt(infos.disk['avail'])))
-        print("     used:  {:>10}".format(sizeof_fmt(infos.disk['used'])))
-        print("     total: {:>10}".format(sizeof_fmt(infos.disk['size'])))
+        print("     avail: {:>10}".format(self.sizeof_fmt(infos.disk['avail'])))
+        print("     used:  {:>10}".format(self.sizeof_fmt(infos.disk['used'])))
+        print("     total: {:>10}".format(self.sizeof_fmt(infos.disk['size'])))
 
     def sizeof_fmt(self, size):
         """ Get the byte size in a human readable way. """
@@ -248,7 +258,7 @@ def config():
         with open(os.path.expanduser(CONFIG_PATH), 'w') as configfile:
             config.write(configfile)
     except EnvironmentError as e:
-        print(e.strerror)
+        print(e.strerror, file=sys.stderr)
 
 def init_parser():
     """ Initialize parser with all arguments and subcommands. """
@@ -306,12 +316,12 @@ def get_client():
         token = config['account']['token']
         logger.debug("token: {}".format(token))
     except IOError as e:
-        print("Error with " + e.filename + ": " + e.strerror)
-        print("Please run " + sys.argv[0] + " config.")
+        print("Error with " + e.filename + ": " + e.strerror, file=sys.stderr)
+        print("Please run " + sys.argv[0] + " config.", file=sys.stderr)
         sys.exit(1)
     except KeyError as e:
-        print("Error with the config file structure.")
-        print("Please run " + sys.argv[0] + " config.")
+        print("Error with the config file structure.", file=sys.stderr)
+        print("Please run " + sys.argv[0] + " config.", file=sys.stderr)
         sys.exit(1)
 
     return putio2.Client(token)
@@ -355,7 +365,9 @@ def run_command(console, args):
     try:
         getattr(console, commands[args.cmd])(args)
     except AttributeError:
-        print("The command does not exist, please report this bug.")
+        print("The command {} does not exist,"
+                " please report this bug.".format(args.cmd),
+                file=sys.stderr)
 
 if __name__ == "__main__":
 
