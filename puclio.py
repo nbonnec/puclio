@@ -66,7 +66,7 @@ class Console:
     def __init__(self, interactive=False):
         self.is_interactive = interactive
         self.client = get_client()
-        self.file_alias = list()
+        self.file_alias = dict()
 
     def list_files(self, args):
         """ List client files with their IDs. """
